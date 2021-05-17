@@ -2,6 +2,7 @@
     package="hcmus.hieuho.mycoin.hhwallet">
    <application
         android:label="hhwallet"
+        android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
