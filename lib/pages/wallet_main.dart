@@ -1,7 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hhwallet/main.dart';
-import 'package:hhwallet/models/address_data.dart';
 import 'package:hhwallet/models/transaction.dart';
 import 'package:hhwallet/pages/send_coin.dart';
 import 'package:hhwallet/pages/transaction_history.dart';
@@ -20,14 +21,31 @@ class WalletMain extends StatefulWidget {
 
 class _WalletMainState extends State<WalletMain> {
   SharedPreferences _sharedPreferences;
-  Future _fetchNetworkCall;
+  StreamController _streamController = new StreamController();
   @override
   void initState() {
     super.initState();
     saveData();
-    // loadAddressData();
-    _fetchNetworkCall = ApiProvider.getAddressData(
+    load();
+    new Timer.periodic(new Duration(seconds: 5), (Timer t) => load());
+  }
+
+  load() async {
+    print('reload data${DateTime.now()}');
+    var data = await ApiProvider.getAddressData(
         widget.privateKey.publicKey.toCompressedHex());
+    _streamController.sink.add(data);
+  }
+
+  @override
+  void didUpdateWidget(WalletMain oldWidget) {
+    super.didUpdateWidget(oldWidget);
+  }
+
+  @override
+  void dispose() {
+    _streamController.close();
+    super.dispose();
   }
 
   void saveData() async {
@@ -40,9 +58,9 @@ class _WalletMainState extends State<WalletMain> {
     return DefaultTextStyle(
         style: Theme.of(context).textTheme.headline2,
         textAlign: TextAlign.center,
-        child: FutureBuilder<AddressData>(
-          future: _fetchNetworkCall, // async work
-          builder: (BuildContext context, AsyncSnapshot<AddressData> snapshot) {
+        child: StreamBuilder(
+          stream: _streamController.stream, // async work
+          builder: (context, snapshot) {
             switch (snapshot.connectionState) {
               case ConnectionState.waiting:
                 return Center(
@@ -51,7 +69,7 @@ class _WalletMainState extends State<WalletMain> {
               default:
                 if (snapshot.hasError)
                   return Text('Error: ${snapshot.error}');
-                else
+                else {
                   return Scaffold(
                     appBar: AppBar(
                       title: Text('Wallet'),
@@ -161,7 +179,9 @@ class _WalletMainState extends State<WalletMain> {
                                       onPressed: () {
                                         Navigator.of(context)
                                             .push(MaterialPageRoute(
-                                          builder: (context) => SendCoin(),
+                                          builder: (context) => SendCoin(
+                                            senderPrivateKey: widget.privateKey,
+                                          ),
                                         ));
                                       },
                                       elevation: 2.0,
@@ -340,6 +360,7 @@ class _WalletMainState extends State<WalletMain> {
                         )
                     ])),
                   );
+                }
             }
           },
         ));

@@ -6,7 +6,7 @@ import 'dart:async';
 class ApiBaseHelper {
   String _baseUrl;
   Future<dynamic> get(String url) async {
-    _baseUrl = 'http://192.168.1.3:5000/';
+    _baseUrl = 'http://192.168.1.4:5000/';
 
     print(_baseUrl + '_baseUrl');
     print('Api Get, url     $_baseUrl$url');
@@ -28,6 +28,27 @@ class ApiBaseHelper {
     return responseJson;
   }
 
+  Future<dynamic> post(String url, var body) async {
+    _baseUrl = 'http://192.168.1.4:5000/';
+    print('Api POST, url     $_baseUrl$url');
+    var responseJson;
+    try {
+      final response = await http.post(Uri.parse('$_baseUrl$url'),
+          headers: <String, String>{
+            'Content-Type': 'application/json; charset=UTF-8',
+          },
+          body: body);
+      responseJson = _returnResponse(response);
+    } on SocketException {
+      print('No net');
+      throw FetchDataException('No Internet connection  ');
+    }
+    print('api post sent!');
+    print(new DateTime.now().toString());
+    print(responseJson.toString());
+    return responseJson;
+  }
+
   dynamic _returnResponse(http.Response response) {
     switch (response.statusCode) {
       case 200:
@@ -37,8 +58,9 @@ class ApiBaseHelper {
         throw BadRequestException(response.body.toString());
       case 401:
       case 403:
+      case 405:
         print(response.headers);
-        throw UnauthorisedException(response.body.toString());
+        throw (response.body.toString());
       case 500:
       default:
         throw FetchDataException(

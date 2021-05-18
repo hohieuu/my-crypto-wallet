@@ -1,22 +1,63 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:hhwallet/resources/api_provider.dart';
 import 'package:secp256k1/secp256k1.dart';
+import 'package:toast/toast.dart';
 
 class SendCoin extends StatefulWidget {
+  final PrivateKey senderPrivateKey;
+  final double amount;
+  SendCoin({this.senderPrivateKey, this.amount});
   @override
   _SendCoinState createState() => _SendCoinState();
 }
 
 class _SendCoinState extends State<SendCoin> {
-  TextEditingController targetAddressController, quantityController;
-  String errorText;
-  bool privateKeyValid, quantityValid;
-  PrivateKey privateKey;
+  TextEditingController receiverAddressController = new TextEditingController(),
+      amountController = new TextEditingController();
+  String errorText, errorText2;
+  bool publicKeyValid = false, amountValid = false;
+  PublicKey publicKey;
 
   @override
   void initState() {
     super.initState();
-    privateKeyValid = false;
-    quantityValid = false;
+    publicKeyValid = false;
+    amountValid = false;
+  }
+
+  sendTransaction() async {
+    FocusScope.of(context).requestFocus(FocusNode());
+
+    final double amount = double.parse(amountController.text);
+    final senderAddress = widget.senderPrivateKey.publicKey.toCompressedHex();
+
+    final receiverAddress = receiverAddressController.text;
+    final message = senderAddress + receiverAddress + amountController.text;
+    print(message);
+    var bytes1 = utf8.encode(message);
+    var digest1 = sha256.convert(bytes1);
+    Signature signature = widget.senderPrivateKey.signature('$digest1');
+    print('private key ${widget.senderPrivateKey.toHex()}');
+    print('public key ${widget.senderPrivateKey.publicKey}');
+    print(signature.verify(widget.senderPrivateKey.publicKey, '$digest1'));
+    print('message $digest1');
+    print('signature:' + signature.toString());
+    print('signature:' + signature.toString());
+    print('signature: ${signature.toHexes()}');
+    var data = await ApiProvider.sendCoin(
+        signature.toRawHex(), senderAddress, receiverAddress, amount);
+
+    if (data['successful']) {
+      Navigator.of(context).pop();
+      Toast.show('Thành công', context,
+          duration: Toast.LENGTH_LONG, gravity: Toast.BOTTOM);
+    } else {
+      Toast.show(data['message'], context,
+          duration: Toast.LENGTH_LONG, gravity: Toast.BOTTOM);
+    }
   }
 
   @override
@@ -33,24 +74,33 @@ class _SendCoinState extends State<SendCoin> {
               children: [
                 Container(
                   child: TextFormField(
-                    controller: targetAddressController,
+                    controller: receiverAddressController,
                     onChanged: (text) {
+                      print(text.length);
                       errorText = null;
-                      if (text.length == 64) {
+                      if (text.length >= 64) {
                         try {
-                          privateKey = PrivateKey.fromHex(text);
+                          // publicKey = publicKey.fromHex(text);
                           setState(() {
-                            privateKeyValid = true;
+                            if (widget.senderPrivateKey.publicKey
+                                    .toCompressedHex() ==
+                                text)
+                              setState(() {
+                                publicKeyValid = false;
+                                errorText = 'Trùng với địa chỉ ví hiện tại';
+                              });
+                            else
+                              publicKeyValid = true;
                           });
                         } catch (ignore) {
                           setState(() {
-                            privateKeyValid = false;
+                            publicKeyValid = false;
                             errorText = 'Không hợp lệ';
                           });
                         }
                       } else
                         setState(() {
-                          privateKeyValid = false;
+                          publicKeyValid = false;
                         });
                     },
                     decoration: InputDecoration(
@@ -64,31 +114,32 @@ class _SendCoinState extends State<SendCoin> {
                 Container(
                   margin: EdgeInsets.only(top: 20),
                   child: TextFormField(
-                    controller: quantityController,
+                    controller: amountController,
                     keyboardType: TextInputType.number,
                     onChanged: (text) {
-                      errorText = null;
-                      if (text != '' && int.parse(text) > 0) {
+                      errorText2 = null;
+                      if (text != '' && double.parse(text) > 0) {
                         try {
                           setState(() {
-                            quantityValid = true;
+                            amountValid = true;
                           });
                         } catch (ignore) {
                           setState(() {
-                            quantityValid = false;
-                            errorText = 'Không hợp lệ';
+                            amountValid = false;
+                            errorText2 = 'Không hợp lệ';
                           });
                         }
                       } else
                         setState(() {
-                          quantityValid = false;
+                          amountValid = false;
                         });
                     },
                     decoration: InputDecoration(
                         border: OutlineInputBorder(),
-                        errorText: (errorText != null && errorText.length != 0)
-                            ? errorText
-                            : null,
+                        errorText:
+                            (errorText2 != null && errorText2.length != 0)
+                                ? errorText2
+                                : null,
                         labelText: 'Số lượng'),
                   ),
                 ),
@@ -97,13 +148,9 @@ class _SendCoinState extends State<SendCoin> {
                     margin: EdgeInsets.only(bottom: 15),
                     child: Column(children: [
                       ElevatedButton(
-                          onPressed: privateKeyValid && quantityValid
+                          onPressed: publicKeyValid && amountValid
                               ? () {
-                                  // Navigator.of(context).push(MaterialPageRoute(
-                                  //   builder: (context) => WalletMain(
-                                  //     privateKey: privateKey,
-                                  //   ),
-                                  // ));
+                                  sendTransaction();
                                 }
                               : null,
                           child: Container(
