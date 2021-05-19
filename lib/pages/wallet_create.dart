@@ -51,6 +51,10 @@ class _WalletCreateState extends State<WalletCreate> {
                             : () {
                                 setState(() {
                                   newPrivateKey = PrivateKey.generate();
+
+                                  print('private key:${newPrivateKey.toHex()}');
+                                  print(
+                                      'public key:${newPrivateKey.publicKey.toCompressedHex()}');
                                 });
                               },
                         child: Container(

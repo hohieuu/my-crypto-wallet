@@ -11,6 +11,7 @@ import 'package:secp256k1/secp256k1.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:toast/toast.dart';
 
 class WalletMain extends StatefulWidget {
   final PrivateKey privateKey;
@@ -22,16 +23,17 @@ class WalletMain extends StatefulWidget {
 class _WalletMainState extends State<WalletMain> {
   SharedPreferences _sharedPreferences;
   StreamController _streamController = new StreamController();
+  Timer _timer;
   @override
   void initState() {
     super.initState();
     saveData();
     load();
-    new Timer.periodic(new Duration(seconds: 5), (Timer t) => load());
+
+    _timer = new Timer.periodic(new Duration(seconds: 10), (Timer t) => load());
   }
 
   load() async {
-    print('reload data${DateTime.now()}');
     var data = await ApiProvider.getAddressData(
         widget.privateKey.publicKey.toCompressedHex());
     _streamController.sink.add(data);
@@ -97,6 +99,7 @@ class _WalletMainState extends State<WalletMain> {
                                       TextButton(
                                         child: Text('Xác nhận'),
                                         onPressed: () {
+                                          _timer.cancel();
                                           _sharedPreferences.clear();
                                           Navigator.of(context).pushReplacement(
                                               MaterialPageRoute(
@@ -297,7 +300,7 @@ class _WalletMainState extends State<WalletMain> {
                           child: GestureDetector(
                               child: Text("Xem lịch sử theo address / txid",
                                   style: TextStyle(
-                                      decoration: TextDecoration.underline,
+                                      decoration: TextDecoration.none,
                                       color: Colors.blue)),
                               onTap: () {
                                 Navigator.of(context).push(MaterialPageRoute(
@@ -307,62 +310,186 @@ class _WalletMainState extends State<WalletMain> {
                       for (Transaction item in snapshot.data == null
                           ? []
                           : snapshot.data.addressTransactions)
-                        Container(
-                          padding: EdgeInsets.all(5),
-                          margin: EdgeInsets.all(5),
-                          width: double.infinity,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
+                        TextButton(
+                            onPressed: () {
+                              showDetailDialog(item);
+                            },
+                            child: Container(
+                              padding: EdgeInsets.all(5),
+                              margin: EdgeInsets.all(5),
+                              width: double.infinity,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  item.type == TransactionType.RECEIVE
-                                      ? Icon(
-                                          Icons.arrow_circle_up,
-                                          color: Colors.red,
-                                        )
-                                      : Icon(
-                                          Icons.arrow_circle_down,
-                                          color: Colors.green,
-                                        ),
-                                  Text(
-                                    item.type == TransactionType.SEND
-                                        ? '  Đã gửi'
-                                        : '  Đã nhận',
-                                    style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold),
-                                  )
-                                ],
-                              ),
-                              Text(item.partnerAddress),
-                              Container(
-                                  width: double.infinity,
-                                  child: Row(
+                                  Row(
                                     children: [
+                                      item.type == TransactionType.RECEIVE
+                                          ? Icon(
+                                              Icons.arrow_circle_up,
+                                              color: Colors.red,
+                                            )
+                                          : Icon(
+                                              Icons.arrow_circle_down,
+                                              color: Colors.green,
+                                            ),
                                       Text(
-                                          '${DateFormat('dd/MM/yyyy – HH:mm:ss').format(item.time)}'),
-                                      Spacer(),
-                                      Text(
-                                        '${item.amount} HH',
+                                        item.type == TransactionType.SEND
+                                            ? '  Đã gửi'
+                                            : '  Đã nhận',
                                         style: TextStyle(
                                             fontSize: 18,
-                                            fontWeight: FontWeight.w400),
-                                      ),
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black),
+                                      )
                                     ],
-                                  )),
-                              Divider(
-                                height: 2,
-                                color: Colors.black,
+                                  ),
+                                  Text(
+                                    item.type == TransactionType.SEND
+                                        ? item.receiver
+                                        : item.sender,
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                  Container(
+                                      width: double.infinity,
+                                      child: Row(
+                                        children: [
+                                          Text(
+                                            '${DateFormat('dd/MM/yyyy – HH:mm:ss').format(item.time)}',
+                                            style:
+                                                TextStyle(color: Colors.black),
+                                          ),
+                                          Spacer(),
+                                          Text(
+                                            '${item.amount} HH',
+                                            style: TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.w400,
+                                                color: Colors.black),
+                                          ),
+                                        ],
+                                      )),
+                                  Divider(
+                                    height: 2,
+                                    color: Colors.black,
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        )
+                            ))
                     ])),
                   );
                 }
             }
           },
         ));
+  }
+
+  showDetailDialog(Transaction item) {
+    showDialog(
+        context: context,
+        builder: (context) => Container(
+            color: Colors.white,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.max,
+              children: [
+                Padding(
+                  child: Text('Transaction Id: ',
+                      textAlign: TextAlign.start,
+                      style: TextStyle(
+                        fontSize: 20,
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        decoration: TextDecoration.none,
+                      )),
+                  padding: EdgeInsets.fromLTRB(10, 10, 10, 5),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: item.txId));
+                    Toast.show('Đã copy txId', context);
+                  },
+                  child: Text('${item.txId}',
+                      textAlign: TextAlign.start,
+                      style: TextStyle(
+                        fontSize: 17,
+                        color: Colors.black,
+                        decoration: TextDecoration.none,
+                      )),
+                ),
+                Padding(
+                  child: Text('Sender address: ',
+                      textAlign: TextAlign.start,
+                      style: TextStyle(
+                        fontSize: 20,
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        decoration: TextDecoration.none,
+                      )),
+                  padding: EdgeInsets.fromLTRB(10, 10, 10, 5),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: item.sender));
+                    Toast.show('Copied sender address', context);
+                  },
+                  child: Text('${item.sender}',
+                      textAlign: TextAlign.start,
+                      style: TextStyle(
+                        fontSize: 17,
+                        color: Colors.black,
+                        decoration: TextDecoration.none,
+                      )),
+                ),
+                Padding(
+                  child: Text('Receiver Id: ',
+                      textAlign: TextAlign.start,
+                      style: TextStyle(
+                        fontSize: 20,
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        decoration: TextDecoration.none,
+                      )),
+                  padding: EdgeInsets.fromLTRB(10, 10, 10, 5),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: item.receiver));
+                    Toast.show('Copied receiver address', context);
+                  },
+                  child: Text('${item.receiver}',
+                      textAlign: TextAlign.start,
+                      style: TextStyle(
+                        fontSize: 17,
+                        color: Colors.black,
+                        decoration: TextDecoration.none,
+                      )),
+                ),
+                Padding(
+                  child: Text('Amount: ',
+                      textAlign: TextAlign.start,
+                      style: TextStyle(
+                        fontSize: 20,
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        decoration: TextDecoration.none,
+                      )),
+                  padding: EdgeInsets.fromLTRB(10, 10, 10, 5),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Clipboard.setData(
+                        ClipboardData(text: item.amount.toString()));
+                    Toast.show('Copied amount', context);
+                  },
+                  child: Text('${item.amount}',
+                      textAlign: TextAlign.start,
+                      style: TextStyle(
+                        fontSize: 17,
+                        color: Colors.black,
+                        decoration: TextDecoration.none,
+                      )),
+                ),
+              ],
+            )));
   }
 }

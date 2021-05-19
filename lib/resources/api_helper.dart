@@ -8,9 +8,7 @@ class ApiBaseHelper {
   Future<dynamic> get(String url) async {
     _baseUrl = 'http://192.168.1.4:5000/';
 
-    print(_baseUrl + '_baseUrl');
     print('Api Get, url     $_baseUrl$url');
-    print(new DateTime.now().toString());
     var responseJson;
     try {
       final response = await http.get(
@@ -22,9 +20,9 @@ class ApiBaseHelper {
       print('No net');
       throw FetchDataException('No Internet connection  ');
     }
-    print('api get recieved!');
-    print(new DateTime.now().toString());
-    print(responseJson.toString());
+    // print('api get recieved!');
+    // print(new DateTime.now().toString());
+    // print(responseJson.toString());
     return responseJson;
   }
 

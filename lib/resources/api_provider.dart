@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:hhwallet/models/address_data.dart';
+import 'package:hhwallet/models/transaction.dart';
 import 'package:secp256k1/secp256k1.dart';
 
 import 'api_helper.dart';
@@ -22,9 +23,18 @@ class ApiProvider {
   static Future<AddressData> getAddressData(String address) async {
     AddressData result;
     final response = await getApiBaseHelper().get("address/$address");
-    print(response);
     result = new AddressData.fromJson(response, address);
     return result;
+  }
+
+  static Future<List<Transaction>> search(String addressOrTxId) async {
+    List<Transaction> results;
+    final response = await getApiBaseHelper().get("search/$addressOrTxId");
+    print(response);
+    results = (response as List)
+        .map((data) => new Transaction.fromJson2(data))
+        .toList();
+    return results;
   }
 
   static Future<dynamic> sendCoin(String signature, String publicKey,
@@ -36,6 +46,7 @@ class ApiProvider {
       "signature": "$signature"
     };
     var jsonBody = jsonEncode(body);
+    print(jsonBody);
     try {
       final response = await getApiBaseHelper().post("transaction", jsonBody);
     } catch (err) {
